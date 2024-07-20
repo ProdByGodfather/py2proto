@@ -1,10 +1,10 @@
-# abar.py
 import os
 import sys
 import subprocess
 from typing import Dict, List, Tuple, Type
 import importlib.util
 import platform
+import typing
 
 class ProtoGenerator:
     messages: Dict[str, Dict[str, str]] = {}
@@ -47,10 +47,26 @@ class ProtoGenerator:
             "sfixed64": "sfixed64",
             "double": "double",
             "enum": "enum",
-            list: "repeated",
-            dict: "map",
             "message": "message"
         }
+
+        if isinstance(python_type, str):
+            return type_mapping.get(python_type, python_type)
+        
+        origin = typing.get_origin(python_type)
+        if origin == list:
+            args = typing.get_args(python_type)
+            if args:
+                return f"repeated {ProtoGenerator._get_proto_type(args[0])}"
+            return "repeated string"
+        elif origin == dict:
+            args = typing.get_args(python_type)
+            if len(args) == 2:
+                key_type = ProtoGenerator._get_proto_type(args[0])
+                value_type = ProtoGenerator._get_proto_type(args[1])
+                return f"map<{key_type}, {value_type}>"
+            return "map<string, string>"
+        
         return type_mapping.get(python_type, "string")
 
     @classmethod
@@ -71,10 +87,10 @@ class ProtoGenerator:
         for message_name, fields in cls.messages.items():
             proto_content += f"message {message_name} {{\n"
             for i, (field_name, field_type) in enumerate(fields.items(), start=1):
-                if field_type == "repeated":
-                    proto_content += f"  repeated {cls._get_proto_type(str)} {field_name} = {i};\n"
-                elif field_type == "map":
-                    proto_content += f"  map<string, int32> {field_name} = {i};\n"
+                if field_type.startswith("repeated"):
+                    proto_content += f"  {field_type} {field_name} = {i};\n"
+                elif field_type.startswith("map"):
+                    proto_content += f"  {field_type} {field_name} = {i};\n"
                 else:
                     proto_content += f"  {field_type} {field_name} = {i};\n"
             proto_content += "}\n\n"
@@ -119,7 +135,7 @@ class ProtoGenerator:
             elif system in ["linux", "darwin"]:  # darwin is for macOS
                 python_command = "python3"
             else:
-                raise OSError(f"Unsupported operating system: {system}")
+                raise OSError(f"Unsupported operating system: {system}\nplease install grpcio-tools")
 
             proto_path = os.path.abspath(proto_file)
             proto_dir = os.path.dirname(proto_path)

@@ -1,4 +1,6 @@
 /venv
 /tests
 /py2proto.egg-info
+/dist
+dist
 token.txt
