@@ -7,7 +7,7 @@ py2proto is a Python library that provides an ORM-like interface for generating 
 - ORM-like syntax for defining Protocol Buffer messages and services
 - Automatic generation of .proto files
 - Automatic generation of pb2 and pb2_grpc files
-- Support for various Protocol Buffer data types
+- Support for various Protocol Buffer data types, including repeated fields
 - Easy-to-use API for defining services and message relationships
 
 ## Installation
@@ -24,6 +24,7 @@ Here's a basic example of how to use py2proto:
 
 ```python
 from py2proto import ProtoGenerator, relation
+from typing import List, Dict
 
 class MessageProto(ProtoGenerator):
     class MessageRequest(ProtoGenerator):
@@ -31,19 +32,19 @@ class MessageProto(ProtoGenerator):
         number: int
         big_number: "int64"
         unsigned_number: "uint32"
-        repeated_field: str
-        map_field: str
+        repeated_field: List[str]  # This will be a repeated field
+        map_field: Dict[str, int]  # This will be a map field
 
     class MessageResponse(ProtoGenerator):
         message: str
-        status: str  # Enum handling can be added later
-        nested: str  # Message handling can be added later
+        status: str
+        nested: str
 
     service = relation("MessageRequest", "MessageResponse")
 
 if __name__ == "__main__":
     # generate_proto(Package, ProtoFileName, Output Directory)
-    file_name = MessageProto.generate_proto("messageservice", "message_service",'protos/')
+    file_name = MessageProto.generate_proto("messageservice", "message_service", 'protos/')
     # generate_pb2(ProtoFile, Output Directory)
     MessageProto.generate_pb2(file_name, "outputs/")
 ```
@@ -61,8 +62,8 @@ message MessageRequest {
   int32 number = 2;
   int64 big_number = 3;
   uint32 unsigned_number = 4;
-  string repeated_field = 5;
-  string map_field = 6;
+  repeated string repeated_field = 5;
+  map<string, int32> map_field = 6;
 }
 
 message MessageResponse {
@@ -95,6 +96,8 @@ py2proto supports the following Protocol Buffer data types:
 - "sfixed32" `(sfixed32)`
 - "sfixed64" `(sfixed64)`
 - "double" `(double)`
+- List[Type] `(repeated)`
+- Dict[KeyType, ValueType] `(map)`
 
 ## API Reference
 ### ProtoGenerator
@@ -113,5 +116,3 @@ Generates pb2 and pb2_grpc files from the specified `.proto` file.
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-[Email](milto:prodbygodfather@gmail.com)

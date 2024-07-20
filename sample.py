@@ -1,5 +1,5 @@
-# main.py
 from py2proto import ProtoGenerator, relation
+from typing import List, Dict
 
 class MessageProto(ProtoGenerator):
     class MessageRequest(ProtoGenerator):
@@ -7,13 +7,13 @@ class MessageProto(ProtoGenerator):
         number: int
         big_number: "int64"
         unsigned_number: "uint32"
-        repeated_field: str
-        map_field: str
+        repeated_field: List[str]  # This will be a repeated field
+        map_field: Dict[str, int]  # This will be a map field
 
     class MessageResponse(ProtoGenerator):
         message: str
-        status: str  # Enum handling can be added later
-        nested: str  # Message handling can be added later
+        status: str
+        nested: str
 
     service = relation("MessageRequest", "MessageResponse")
 
