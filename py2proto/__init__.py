@@ -2,4 +2,4 @@ from .main import ProtoGenerator, relation
 
 __all__ = ['ProtoGenerator', 'relation']
 
-__version__ = "1.4.1"
+__version__ = "2.0.0"
