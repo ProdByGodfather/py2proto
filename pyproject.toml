@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2proto"
-version = "2.0.0"
+version = "2.1.0"
 description = "An ORM-like Python library for generating and managing gRPC proto files and pb2 files"
 readme = "README.md"
 authors = [
