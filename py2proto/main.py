@@ -124,7 +124,7 @@ class ProtoGenerator:
             print(f"An error occurred: {e}")
 
     @classmethod
-    def generate_swagger(cls, proto_file, version="1.0.0"):
+    def generate_swagger(cls, proto_file):
         swagger_file = os.path.join(cls.output_directory, "swagger.json")
         protoc.main((
             '',
@@ -140,7 +140,7 @@ class ProtoGenerator:
 
         swagger = {
             "swagger": "2.0",
-            "info": {"title": module_name, "version": version},
+            "info": {"title": module_name, "version": "1.0.0"},
             "schemes": ["http"],
             "consumes": ["application/json"],
             "produces": ["application/json"],
@@ -187,7 +187,7 @@ class ProtoGenerator:
                                 "name": field.name,
                                 "type": type_mapping.get(field.type, "string"),
                                 "required": False,
-                                "description": f"Field {field.name} (type: {type_mapping.get(field.type, 'string')})"
+                                "description": f"Field {field.name}"
                             } for field in method.input_type.fields
                         ],
                         "responses": {
@@ -205,7 +205,7 @@ class ProtoGenerator:
         return swagger_file
 
     @classmethod
-    def run_swagger(cls, version="2.0.0"):
+    def run_swagger(cls, version="2.0.0", port=5937):
         swagger_file = os.path.join(cls.output_directory, "swagger.json")
         
         from flask import Flask, request, jsonify, send_file, abort
@@ -305,7 +305,8 @@ class ProtoGenerator:
                 print(f"Error processing gRPC request: {e}")
                 return jsonify({"error": str(e)}), 500
 
-        app.run(debug=True)
+        print(f"Starting Swagger UI on port {port}")
+        app.run(debug=True, port=port)
 
 def relation(request: str, response: str):
     return ("MessageService", request, response)
