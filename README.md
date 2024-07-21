@@ -1,18 +1,19 @@
 # py2proto
 
-py2proto is a Python library that provides an ORM-like interface for generating gRPC proto files and pb2 files. It simplifies the process of creating and managing Protocol Buffer definitions for gRPC services.
+py2proto is a powerful Python library that simplifies the process of creating gRPC services and Protocol Buffer definitions. It automatically generates .proto files, gRPC code, and Swagger UI documentation from Python class definitions.
 
 ## Features
 
-- ORM-like syntax for defining Protocol Buffer messages and services
-- Automatic generation of .proto files
-- Automatic generation of pb2 and pb2_grpc files
-- Support for various Protocol Buffer data types, including repeated fields
-- Easy-to-use API for defining services and message relationships
+- Automatic generation of .proto files from Python classes
+- Generation of gRPC Python code
+- Swagger UI generation for easy API testing and documentation
+- Support for complex data types (lists, dictionaries)
+- Custom output directory setting
+- Built-in Swagger UI server
 
 ## Installation
 
-You can install py2proto using pip:
+Install py2proto using pip:
 
 ```bash
 pip install py2proto
@@ -20,62 +21,127 @@ pip install py2proto
 
 ## Usage
 
-Here's a basic example of how to use py2proto:
+1. Import necessary modules:
 
 ```python
 from py2proto import ProtoGenerator, relation
 from typing import List, Dict
-
+```
+2. Define your message classes:
+```python
 class MessageProto(ProtoGenerator):
     class MessageRequest(ProtoGenerator):
         message: str
         number: int
-        big_number: "int64"
-        unsigned_number: "uint32"
-        repeated_field: List[str]  # This will be a repeated field
-        map_field: Dict[str, int]  # This will be a map field
 
     class MessageResponse(ProtoGenerator):
         message: str
-        status: str
-        nested: str
 
     service = relation("MessageRequest", "MessageResponse")
-
+```
+3. Generate files and run Swagger UI:
+```python
 if __name__ == "__main__":
-    # generate_proto(Package, ProtoFileName, Output Directory)
-    file_name = MessageProto.generate_proto("messageservice", "message_service", 'protos/')
-    # generate_pb2(ProtoFile, Output Directory)
-    MessageProto.generate_pb2(file_name, "outputs/")
+    MessageProto.set_output_directory("outputs")
+    proto_file = MessageProto.generate_proto("messageservice", "message_service")
+    MessageProto.generate_pb2(proto_file)
+    swagger_file = MessageProto.generate_swagger(proto_file)
+    MessageProto.run_swagger()
 ```
 
 This script will generate a .proto file in the 'protos/' directory and pb2 files in the 'outputs/' directory.
 Finally, the output of the generated proto file will be as follows:
 
-```proto
-syntax = "proto3";
+## Detailed Function Explanations
 
-package messageservice;
+### set_output_directory(directory: str)
+Sets the output directory for generated files.
 
-message MessageRequest {
-  string message = 1;
-  int32 number = 2;
-  int64 big_number = 3;
-  uint32 unsigned_number = 4;
-  repeated string repeated_field = 5;
-  map<string, int32> map_field = 6;
-}
-
-message MessageResponse {
-  string message = 1;
-  string status = 2;
-  string nested = 3;
-}
-
-service MessageService {
-  rpc SendMessage (MessageRequest) returns (MessageResponse) {}
-}
+Example:
+```python
+MessageProto.set_output_directory("custom_output")
 ```
+
+### generate_proto(package_name: str, file_name: str) -> str
+Generates a .proto file based on the defined classes.
+
+Example:
+```python
+proto_file = MessageProto.generate_proto("mypackage", "myservice")
+```
+
+### generate_pb2(proto_file: str)
+Generates Python gRPC code from the .proto file.
+
+Example:
+```python
+MessageProto.generate_pb2(proto_file)
+```
+
+### generate_swagger(proto_file: str) -> str
+Generates a Swagger JSON file for API documentation.
+
+Example:
+```python
+swagger_file = MessageProto.generate_swagger(proto_file)
+```
+
+### run_swagger()
+Starts a Flask server to serve the Swagger UI.
+
+Example:
+```python
+MessageProto.run_swagger()
+```
+
+## Advanced Usage
+You can use complex data types in your message definitions:
+```python
+class ComplexProto(ProtoGenerator):
+    class ComplexRequest(ProtoGenerator):
+        list_field: List[str]
+        dict_field: Dict[str, int]
+
+    class ComplexResponse(ProtoGenerator):
+        result: List[Dict[str, str]]
+
+    service = relation("ComplexRequest", "ComplexResponse")
+```
+
+## Multiple Services
+Define multiple services in a single Proto class:
+```python
+class MultiServiceProto(ProtoGenerator):
+    class Request1(ProtoGenerator):
+        field1: str
+
+    class Response1(ProtoGenerator):
+        result1: str
+
+    class Request2(ProtoGenerator):
+        field2: int
+
+    class Response2(ProtoGenerator):
+        result2: int
+
+    service1 = relation("Request1", "Response1")
+    service2 = relation("Request2", "Response2")
+```
+
+## Why Use py2proto?
+1. Simplicity: Define your gRPC services using familiar Python syntax.
+2. Automation: Automatically generate .proto files and gRPC code.
+3. Documentation: Get Swagger UI documentation out of the box.
+4. Flexibility: Support for complex data types and multiple services.
+5. Time-saving: Reduce boilerplate code and manual proto file writing.
+
+## Requirements
+
+- Python 3.6+
+- grpcio
+- grpcio-tools
+- Flask (for Swagger UI)
+
 
 ## Supported Data Types
 
@@ -99,20 +165,6 @@ py2proto supports the following Protocol Buffer data types:
 - List[Type] `(repeated)`
 - Dict[KeyType, ValueType] `(map)`
 
-## API Reference
-### ProtoGenerator
-The base class for defining Protocol Buffer messages and services.
-### relation(request: str, response: str)
-A function to define the relationship between request and response messages in a service.
-### generate_proto(package_name: str, file_name: str, output_dir: str = None)
-Generates a `.proto` file with the specified package name and file name.
-- package_name: The name of the package for the Protocol Buffer definitions.
-- file_name: The name of the output .proto file (without extension).
-- output_dir: (Optional) The directory where the .proto file will be saved. If not specified, it will use the current directory.
-### generate_pb2(proto_file: str, output_dir: str = None)
-Generates pb2 and pb2_grpc files from the specified `.proto` file.
-- proto_file: The path to the .proto file.
-- output_dir: **(Optional)** The directory where the pb2 files will be saved. If not specified, it will use the current directory.
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.

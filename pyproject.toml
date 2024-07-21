@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2proto"
-version = "1.4.0"
+version = "2.0.0"
 description = "An ORM-like Python library for generating and managing gRPC proto files and pb2 files"
 readme = "README.md"
 authors = [
@@ -19,7 +19,8 @@ classifiers = [
 keywords = ["grpc", "protobuf", "code generation", "protobuf ORM", "auto create pb2 & proto file", "py2proto"]
 dependencies = [
     "grpcio-tools>=1.30.0",
-    "grpcio>=1.30.0"
+    "grpcio>=1.30.0",
+    "Flask>=2.0.0"
 ]
 requires-python = ">=3.8"
 

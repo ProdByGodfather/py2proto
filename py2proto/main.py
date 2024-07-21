@@ -2,13 +2,23 @@ import os
 import sys
 import subprocess
 from typing import Dict, List, Tuple, Type
-import importlib.util
+import importlib
 import platform
 import typing
+import json
+from google.protobuf.json_format import MessageToDict, ParseDict
+from grpc_tools import protoc
+import grpc
 
 class ProtoGenerator:
     messages: Dict[str, Dict[str, str]] = {}
     services: List[Tuple[str, str, str]] = []
+    output_directory: str = os.getcwd()
+
+    @classmethod
+    def set_output_directory(cls, directory: str):
+        cls.output_directory = os.path.abspath(directory)
+        os.makedirs(cls.output_directory, exist_ok=True)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -31,28 +41,14 @@ class ProtoGenerator:
     @staticmethod
     def _get_proto_type(python_type):
         type_mapping = {
-            int: "int32",
-            float: "float",
-            str: "string",
-            bool: "bool",
-            bytes: "bytes",
-            "int64": "int64",
-            "uint32": "uint32",
-            "uint64": "uint64",
-            "sint32": "sint32",
-            "sint64": "sint64",
-            "fixed32": "fixed32",
-            "fixed64": "fixed64",
-            "sfixed32": "sfixed32",
-            "sfixed64": "sfixed64",
-            "double": "double",
-            "enum": "enum",
-            "message": "message"
+            int: "int32", float: "float", str: "string", bool: "bool", bytes: "bytes",
+            "int64": "int64", "uint32": "uint32", "uint64": "uint64",
+            "sint32": "sint32", "sint64": "sint64", "fixed32": "fixed32",
+            "fixed64": "fixed64", "sfixed32": "sfixed32", "sfixed64": "sfixed64",
+            "double": "double", "enum": "enum", "message": "message"
         }
-
         if isinstance(python_type, str):
             return type_mapping.get(python_type, python_type)
-        
         origin = typing.get_origin(python_type)
         if origin == list:
             args = typing.get_args(python_type)
@@ -66,7 +62,6 @@ class ProtoGenerator:
                 value_type = ProtoGenerator._get_proto_type(args[1])
                 return f"map<{key_type}, {value_type}>"
             return "map<string, string>"
-        
         return type_mapping.get(python_type, "string")
 
     @classmethod
@@ -74,35 +69,20 @@ class ProtoGenerator:
         cls.services.append(service_def)
 
     @classmethod
-    def generate_proto(cls, package_name: str, file_name: str, output_dir: str = None):
-        if output_dir is None:
-            output_dir = os.getcwd()
-        else:
-            os.makedirs(output_dir, exist_ok=True)
-        
-        proto_path = os.path.join(output_dir, f"{file_name}.proto")
-
+    def generate_proto(cls, package_name: str, file_name: str):
+        proto_path = os.path.join(cls.output_directory, f"{file_name}.proto")
         proto_content = f"syntax = \"proto3\";\n\npackage {package_name};\n\n"
-
         for message_name, fields in cls.messages.items():
             proto_content += f"message {message_name} {{\n"
             for i, (field_name, field_type) in enumerate(fields.items(), start=1):
-                if field_type.startswith("repeated"):
-                    proto_content += f"  {field_type} {field_name} = {i};\n"
-                elif field_type.startswith("map"):
-                    proto_content += f"  {field_type} {field_name} = {i};\n"
-                else:
-                    proto_content += f"  {field_type} {field_name} = {i};\n"
+                proto_content += f"  {field_type} {field_name} = {i};\n"
             proto_content += "}\n\n"
-
         for service_name, request, response in cls.services:
             proto_content += f"service {service_name} {{\n"
             proto_content += f"  rpc SendMessage ({request}) returns ({response}) {{}}\n"
             proto_content += "}\n"
-
         with open(proto_path, "w") as f:
             f.write(proto_content)
-
         print(f"Proto file '{proto_path}' generated successfully.")
         return proto_path
 
@@ -122,45 +102,210 @@ class ProtoGenerator:
                 print(f"Failed to install grpcio-tools: {e}")
                 return False
 
-    @staticmethod
-    def generate_pb2(proto_file: str, output_dir: str = None):
+    @classmethod
+    def generate_pb2(cls, proto_file: str):
         if not ProtoGenerator.check_and_install_grpcio_tools():
             print("Unable to proceed without grpcio-tools.")
             return
-
         try:
             system = platform.system().lower()
-            if system == "windows":
-                python_command = sys.executable
-            elif system in ["linux", "darwin"]:  # darwin is for macOS
-                python_command = "python3"
-            else:
-                raise OSError(f"Unsupported operating system: {system}\nplease install grpcio-tools")
-
+            python_command = sys.executable if system == "windows" else "python3"
             proto_path = os.path.abspath(proto_file)
             proto_dir = os.path.dirname(proto_path)
-            
-            if output_dir is None:
-                output_dir = os.getcwd()
-            else:
-                os.makedirs(output_dir, exist_ok=True)
-
             subprocess.run([python_command, '-m', 'grpc_tools.protoc',
                             f'-I{proto_dir}',
-                            f'--python_out={output_dir}',
-                            f'--grpc_python_out={output_dir}',
+                            f'--python_out={cls.output_directory}',
+                            f'--grpc_python_out={cls.output_directory}',
                             proto_path],
                            check=True)
-            
             base_name = os.path.splitext(os.path.basename(proto_file))[0]
-            print(f"Generated {base_name}_pb2.py and {base_name}_pb2_grpc.py in {output_dir} successfully.")
-        except subprocess.CalledProcessError as e:
-            print(f"Error generating pb2 files: {e}")
-            print(f"Command used: {' '.join(e.cmd)}")
-        except OSError as e:
-            print(f"OS Error: {e}")
+            print(f"Generated {base_name}_pb2.py and {base_name}_pb2_grpc.py in {cls.output_directory} successfully.")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            print(f"An error occurred: {e}")
+
+    @classmethod
+    def generate_swagger(cls, proto_file, version="1.0.0"):
+        swagger_file = os.path.join(cls.output_directory, "swagger.json")
+        protoc.main((
+            '',
+            f'-I{cls.output_directory}',
+            f'--python_out={cls.output_directory}',
+            f'--grpc_python_out={cls.output_directory}',
+            proto_file
+        ))
+        module_name = os.path.splitext(os.path.basename(proto_file))[0]
+        sys.path.append(cls.output_directory)
+        pb2 = importlib.import_module(f"{module_name}_pb2")
+        pb2_grpc = importlib.import_module(f"{module_name}_pb2_grpc")
+
+        swagger = {
+            "swagger": "2.0",
+            "info": {"title": module_name, "version": version},
+            "schemes": ["http"],
+            "consumes": ["application/json"],
+            "produces": ["application/json"],
+            "paths": {}
+        }
+
+        type_mapping = {
+            1: "number", 2: "number", 3: "string", 4: "string", 5: "number",
+            6: "string", 7: "number", 8: "boolean", 9: "string", 11: "string",
+            13: "number", 14: "string", 15: "number", 16: "string", 17: "number", 18: "string",
+        }
+
+        def descriptor_to_json(descriptor):
+            fields = {}
+            for field in descriptor.fields:
+                field_type = type_mapping.get(field.type, "string")
+                if field.type == field.TYPE_MESSAGE:
+                    field_type = descriptor_to_json(field.message_type)
+                elif field.type == field.TYPE_ENUM:
+                    field_type = "string"
+                if field.label == field.LABEL_REPEATED:
+                    fields[field.name] = {"type": "array", "items": {"type": field_type}}
+                else:
+                    fields[field.name] = {"type": field_type}
+            return {"type": "object", "properties": fields}
+
+        for service_name, service in pb2.DESCRIPTOR.services_by_name.items():
+            for method in service.methods:
+                path = f"/{service_name}/{method.name}"
+                swagger["paths"][path] = {
+                    "get": {
+                        "summary": method.name,
+                        "parameters": [
+                            {
+                                "in": "query",
+                                "name": "server_url",
+                                "type": "string",
+                                "required": True,
+                                "description": "gRPC server URL (e.g., localhost:50051)"
+                            }
+                        ] + [
+                            {
+                                "in": "query",
+                                "name": field.name,
+                                "type": type_mapping.get(field.type, "string"),
+                                "required": False,
+                                "description": f"Field {field.name} (type: {type_mapping.get(field.type, 'string')})"
+                            } for field in method.input_type.fields
+                        ],
+                        "responses": {
+                            "200": {
+                                "description": "Successful response",
+                                "schema": descriptor_to_json(method.output_type)
+                            }
+                        }
+                    }
+                }
+
+        with open(swagger_file, 'w') as f:
+            json.dump(swagger, f, indent=2)
+        
+        return swagger_file
+
+    @classmethod
+    def run_swagger(cls, version="2.0.0"):
+        swagger_file = os.path.join(cls.output_directory, "swagger.json")
+        
+        from flask import Flask, request, jsonify, send_file, abort
+        import grpc
+        import importlib
+        from google.protobuf.json_format import ParseDict, MessageToDict
+
+        app = Flask(__name__)
+        
+        swagger_file_path = os.path.abspath(swagger_file)
+
+        # اضافه کردن مسیر خروجی به sys.path
+        sys.path.append(cls.output_directory)
+
+        @app.route('/')
+        def swagger_ui():
+            return f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <title>Swagger UI</title>
+                <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.51.1/swagger-ui.css" >
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.51.1/swagger-ui-bundle.js"> </script>
+            </head>
+            <body>
+                <div id="swagger-ui"></div>
+                <script>
+                    window.onload = function() {{
+                        SwaggerUIBundle({{
+                            url: "/swagger.json",
+                            dom_id: '#swagger-ui',
+                            presets: [
+                                SwaggerUIBundle.presets.apis,
+                                SwaggerUIBundle.SwaggerUIStandalonePreset
+                            ],
+                            layout: "BaseLayout",
+                            requestInterceptor: (request) => {{
+                                request.headers['X-Swagger-Version'] = '{version}';
+                                return request;
+                            }}
+                        }})
+                    }}
+                </script>
+            </body>
+            </html>
+            """
+
+        @app.route('/swagger.json')
+        def swagger_json():
+            try:
+                print(f"Serving swagger file from: {swagger_file_path}")
+                with open(swagger_file_path, 'r') as f:
+                    swagger_data = json.load(f)
+                swagger_data['info']['version'] = request.headers.get('X-Swagger-Version', version)
+                return jsonify(swagger_data)
+            except Exception as e:
+                print(f"Error serving swagger file: {e}")
+                abort(500)
+
+        @app.route('/<service>/<method>', methods=['GET'])
+        def grpc_request(service, method):
+            server_url = request.args.get('server_url')
+            if not server_url:
+                return jsonify({"error": "server_url is required"}), 400
+            
+            try:
+                # استفاده از نام فایل صحیح برای import
+                pb2 = importlib.import_module(f"outputs.message_service_pb2")
+                pb2_grpc = importlib.import_module(f"outputs.message_service_pb2_grpc")
+
+                channel = grpc.insecure_channel(server_url)
+                stub_class = getattr(pb2_grpc, f"{service}Stub")
+                stub = stub_class(channel)
+
+                request_class = getattr(pb2, "MessageRequest")
+                request_message = request_class()
+                for field in request_class.DESCRIPTOR.fields:
+                    value = request.args.get(field.name)
+                    if value is not None:
+                        if field.type == field.TYPE_MESSAGE:
+                            sub_message = getattr(request_message, field.name)
+                            ParseDict(json.loads(value), sub_message)
+                        elif field.type in [field.TYPE_INT32, field.TYPE_INT64]:
+                            setattr(request_message, field.name, int(value))
+                        elif field.type == field.TYPE_BOOL:
+                            setattr(request_message, field.name, value.lower() == 'true')
+                        else:
+                            setattr(request_message, field.name, value)
+
+                grpc_method = getattr(stub, "SendMessage")
+                response = grpc_method(request_message)
+
+                response_dict = MessageToDict(response, preserving_proto_field_name=True)
+                return jsonify(response_dict)
+            except Exception as e:
+                print(f"Error processing gRPC request: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        app.run(debug=True)
 
 def relation(request: str, response: str):
     return ("MessageService", request, response)
