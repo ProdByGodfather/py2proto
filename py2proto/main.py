@@ -9,10 +9,11 @@ import json
 from google.protobuf.json_format import MessageToDict, ParseDict
 from grpc_tools import protoc
 import grpc
+from flask import Flask, request, jsonify, abort
 
 class ProtoGenerator:
     messages: Dict[str, Dict[str, str]] = {}
-    services: List[Tuple[str, str, str]] = []
+    services: List[Tuple[str, str, str, str]] = []  # Changed to include method name
     output_directory: str = os.getcwd()
 
     @classmethod
@@ -29,7 +30,11 @@ class ProtoGenerator:
                 if issubclass(attr_value, ProtoGenerator):
                     cls._add_message(attr_name, attr_value.__annotations__)
             elif attr_name == 'service':
-                cls._add_service(attr_value)
+                if isinstance(attr_value, list):
+                    for service in attr_value:
+                        cls._add_service(service)
+                else:
+                    cls._add_service(attr_value)
 
     @classmethod
     def _add_message(cls, name: str, fields: Dict[str, Type]):
@@ -77,9 +82,9 @@ class ProtoGenerator:
             for i, (field_name, field_type) in enumerate(fields.items(), start=1):
                 proto_content += f"  {field_type} {field_name} = {i};\n"
             proto_content += "}\n\n"
-        for service_name, request, response in cls.services:
+        for service_name, method_name, request, response in cls.services:
             proto_content += f"service {service_name} {{\n"
-            proto_content += f"  rpc SendMessage ({request}) returns ({response}) {{}}\n"
+            proto_content += f"  rpc {method_name} ({request}) returns ({response}) {{}}\n"
             proto_content += "}\n"
         with open(proto_path, "w") as f:
             f.write(proto_content)
@@ -208,16 +213,10 @@ class ProtoGenerator:
     def run_swagger(cls, version="2.0.0", port=5937):
         swagger_file = os.path.join(cls.output_directory, "swagger.json")
         
-        from flask import Flask, request, jsonify, send_file, abort
-        import grpc
-        import importlib
-        from google.protobuf.json_format import ParseDict, MessageToDict
-
         app = Flask(__name__)
         
         swagger_file_path = os.path.abspath(swagger_file)
 
-        # اضافه کردن مسیر خروجی به sys.path
         sys.path.append(cls.output_directory)
 
         @app.route('/')
@@ -273,15 +272,14 @@ class ProtoGenerator:
                 return jsonify({"error": "server_url is required"}), 400
             
             try:
-                # استفاده از نام فایل صحیح برای import
-                pb2 = importlib.import_module(f"outputs.message_service_pb2")
-                pb2_grpc = importlib.import_module(f"outputs.message_service_pb2_grpc")
+                pb2 = importlib.import_module(f"message_service_pb2")
+                pb2_grpc = importlib.import_module(f"message_service_pb2_grpc")
 
                 channel = grpc.insecure_channel(server_url)
                 stub_class = getattr(pb2_grpc, f"{service}Stub")
                 stub = stub_class(channel)
 
-                request_class = getattr(pb2, "MessageRequest")
+                request_class = getattr(pb2, f"{method}Request")
                 request_message = request_class()
                 for field in request_class.DESCRIPTOR.fields:
                     value = request.args.get(field.name)
@@ -296,7 +294,7 @@ class ProtoGenerator:
                         else:
                             setattr(request_message, field.name, value)
 
-                grpc_method = getattr(stub, "SendMessage")
+                grpc_method = getattr(stub, method)
                 response = grpc_method(request_message)
 
                 response_dict = MessageToDict(response, preserving_proto_field_name=True)
@@ -308,5 +306,5 @@ class ProtoGenerator:
         print(f"Starting Swagger UI on port {port}")
         app.run(debug=True, port=port)
 
-def relation(request: str, response: str):
-    return ("MessageService", request, response)
+def relation(method_name: str, request: str, response: str):
+    return ("MessageService", method_name, request, response)

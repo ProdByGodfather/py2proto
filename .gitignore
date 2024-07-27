@@ -1,4 +1,5 @@
 /venv
+/.venv
 /tests
 /py2proto.egg-info
 /dist

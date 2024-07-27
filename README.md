@@ -37,7 +37,8 @@ class MessageProto(ProtoGenerator):
     class MessageResponse(ProtoGenerator):
         message: str
 
-    service = relation("MessageRequest", "MessageResponse")
+    # relation(`relation Name`, `request function`, `returnes fucntion`)
+    service = relation("SendMessage", "MessageRequest", "MessageResponse")
 ```
 3. Generate files and run Swagger UI:
 ```python
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     # generate_pb2(`proto file`)
     MessageProto.generate_pb2(proto_file)
     # generate_wsagger(`proto file`)
-    swagger_file = MessageProto.generate_swagger(proto_file)
+    swagger_file = MessageProto.generate_swagger(proto_file
     # run_swagger(`version`, `port`)
     MessageProto.run_swagger(version="2.0.1", port=5937)
 ```
@@ -58,6 +59,14 @@ This script will generate a .proto file in the 'protos/' directory and pb2 files
 Finally, the output of the generated proto file will be as follows:
 
 ## Detailed Function Explanations
+
+### relation(method_name: str, request: str, response: str)
+Defines a gRPC service method with its request and response types.
+
+Example:
+```python
+service = relation("SendMessage", "MessageRequest", "MessageResponse")
+```
 
 ### set_output_directory(directory: str)
 Sets the output directory for generated files.
