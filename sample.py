@@ -1,5 +1,4 @@
 from py2proto import ProtoGenerator, relation
-from typing import List, Dict
 
 class MessageProto(ProtoGenerator):
     class MessageRequest(ProtoGenerator):
@@ -9,21 +8,25 @@ class MessageProto(ProtoGenerator):
     class MessageResponse(ProtoGenerator):
         message: str
 
-    # relation(`relation Name`, `request function`, `returnes fucntion`)
     service = relation("SendMessage", "MessageRequest", "MessageResponse")
 
 if __name__ == "__main__":
-    # set_output_directory(`The destination directory for dumping json, pb2 and proto files`)
+    # Set output directory
     MessageProto.set_output_directory("outputs")
     
-    # generate_proto(`proto package name`, `proto file name`)
+    # Generate proto file
     proto_file = MessageProto.generate_proto("messageservice", "message_service")
     
-    # generate_pb2(`proto file`)
+    # Generate pb2 files
     MessageProto.generate_pb2(proto_file)
     
-    # generate_swagger(`proto file`)
+    # Generate Swagger file
     swagger_file = MessageProto.generate_swagger(proto_file)
     
-    # run_swagger(`version`, `port`)
-    MessageProto.run_swagger(version="2.0.1", port=5937)
+    # Generate gRPC files for Python and JavaScript
+    MessageProto.generate_grpc_files(['python', 'javascript'], proto_file, port=50051)
+    
+    # Run Swagger UI
+    MessageProto.run_flask()
+
+    

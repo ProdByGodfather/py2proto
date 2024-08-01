@@ -10,6 +10,7 @@ py2proto is a powerful Python library that simplifies the process of creating gR
 - Support for complex data types (lists, dictionaries)
 - Custom output directory setting
 - Built-in Swagger UI server
+- Creating server and client codes for Python and JavaScript programming languages
 
 ## Installation
 
@@ -43,16 +44,25 @@ class MessageProto(ProtoGenerator):
 3. Generate files and run Swagger UI:
 ```python
 if __name__ == "__main__":
-    # set_output_directory(`The destination directory for dumping json, pb2 and proto files`)
+if __name__ == "__main__":
+    # Set output directory
     MessageProto.set_output_directory("outputs")
-    # generate_proto(`proto package name`, `proto file name`)
+    
+    # Generate proto file
     proto_file = MessageProto.generate_proto("messageservice", "message_service")
-    # generate_pb2(`proto file`)
+    
+    # Generate pb2 files
     MessageProto.generate_pb2(proto_file)
-    # generate_wsagger(`proto file`)
-    swagger_file = MessageProto.generate_swagger(proto_file
-    # run_swagger(`version`, `port`)
-    MessageProto.run_swagger(version="2.0.1", port=5937)
+    
+    # Generate Swagger file
+    swagger_file = MessageProto.generate_swagger(proto_file)
+    
+    # Generate gRPC server & client files for Python and JavaScript
+    MessageProto.generate_grpc_files(['python', 'javascript'], proto_file, port=50051)
+    
+    # Run Swagger UI
+    MessageProto.run_flask()
+
 ```
 
 This script will generate a .proto file in the 'protos/' directory and pb2 files in the 'outputs/' directory.
@@ -106,6 +116,14 @@ Starts a Flask server to serve the Swagger UI.
 Example:
 ```python
 MessageProto.run_swagger()
+```
+
+### generate_grpc_files(languages: List[str], proto_file: str, port: int = 50051)
+Generates gRPC code for the specified languages.
+
+Example:
+```python
+MessageProto.generate_grpc_files(['python', 'javascript'], proto_file, port=50051)
 ```
 
 ## Advanced Usage
