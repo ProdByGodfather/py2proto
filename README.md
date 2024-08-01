@@ -44,7 +44,6 @@ class MessageProto(ProtoGenerator):
 3. Generate files and run Swagger UI:
 ```python
 if __name__ == "__main__":
-if __name__ == "__main__":
     # Set output directory
     MessageProto.set_output_directory("outputs")
     
