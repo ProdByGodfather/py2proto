@@ -10,7 +10,7 @@ py2proto is a powerful Python library that simplifies the process of creating gR
 - Support for complex data types (lists, dictionaries)
 - Custom output directory setting
 - Built-in Swagger UI server
-- Creating server and client codes for Python and JavaScript programming languages
+- Creating server and client codes for Python and JavaScript programming languages.
 
 ## Installation
 
